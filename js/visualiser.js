@@ -12,7 +12,9 @@ window.clearCharts = function () {
   document.getElementById('table-container').innerHTML = '';
   document.getElementById('graph-section').style.display = 'none';
   document.getElementById('table-controls').style.display = 'none';
-  d3.select('#d3-tooltip').remove();
+  // Remove tooltip without depending on D3 being loaded
+  const tip = document.getElementById('d3-tooltip');
+  if (tip) tip.remove();
 };
 
 window.renderAll = function (profiles, topN = 30) {
@@ -43,7 +45,7 @@ window.renderAll = function (profiles, topN = 30) {
   const graphSection = document.getElementById('graph-section');
   graphSection.style.display = 'block';
   document.getElementById('graph-title').textContent = t('graphTitle');
-  renderGraph(profiles, topN);
+  try { renderGraph(profiles, topN); } catch (e) { console.warn('D3 graph failed:', e); }
 
   // Table with search/export controls
   document.getElementById('table-controls').style.display = 'flex';
@@ -88,6 +90,7 @@ function renderTopFriends(profiles, topN) {
     stroke: 'white',
     strokeWidth: 0.8,
     padding: 0.4,
+    height: 850,
     margin: { top: 50, right: 30, bottom: 50, left: 120 },
     font: 0,
     interactive: true,

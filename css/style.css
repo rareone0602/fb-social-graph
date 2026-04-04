@@ -300,7 +300,7 @@ button {
   overflow: hidden;
 }
 
-.chart-wide { flex: 2; min-width: 500px; min-height: 540px; }
+.chart-wide { flex: 2; min-width: 500px; min-height: 920px; }
 
 .chart-box svg text {
   fill: var(--text) !important;
