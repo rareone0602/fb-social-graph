@@ -1,5 +1,6 @@
 /**
  * Renders roughViz charts and a ranked table from parsed profiles.
+ * Uses window.t() for translated strings.
  */
 
 function truncate(name, max = 16) {
@@ -15,7 +16,6 @@ function renderAll(profiles, topN = 30) {
   clearCharts();
   const chartsEl = document.getElementById('charts');
 
-  // Create chart containers
   chartsEl.innerHTML = `
     <div class="chart-row">
       <div class="chart-box chart-wide" id="chart-top"></div>
@@ -31,7 +31,6 @@ function renderAll(profiles, topN = 30) {
   renderStats(profiles);
   renderTable(profiles);
 
-  // roughViz charts need a small delay for DOM layout
   requestAnimationFrame(() => {
     renderTopFriends(profiles, topN);
     renderDonut(profiles);
@@ -49,11 +48,11 @@ function renderStats(profiles) {
   const maxRaw = Math.max(...profiles.map(p => p.rawBase)).toFixed(6);
 
   document.getElementById('stats-bar').innerHTML = `
-    <div class="stat"><span class="stat-val">${n}</span><span class="stat-label">Profiles</span></div>
-    <div class="stat"><span class="stat-val">${nActive}</span><span class="stat-label">Active</span></div>
-    <div class="stat"><span class="stat-val">${avgScore}</span><span class="stat-label">Avg Score</span></div>
-    <div class="stat"><span class="stat-val">${topName}</span><span class="stat-label">#1 Friend</span></div>
-    <div class="stat"><span class="stat-val">${minRaw}–${maxRaw}</span><span class="stat-label">Raw Range</span></div>
+    <div class="stat"><span class="stat-val">${n}</span><span class="stat-label">${t('statProfiles')}</span></div>
+    <div class="stat"><span class="stat-val">${nActive}</span><span class="stat-label">${t('statActive')}</span></div>
+    <div class="stat"><span class="stat-val">${avgScore}</span><span class="stat-label">${t('statAvg')}</span></div>
+    <div class="stat"><span class="stat-val">${topName}</span><span class="stat-label">${t('statTop')}</span></div>
+    <div class="stat"><span class="stat-val">${minRaw}–${maxRaw}</span><span class="stat-label">${t('statRange')}</span></div>
   `;
 }
 
@@ -65,7 +64,7 @@ function renderTopFriends(profiles, topN) {
       labels: top.map(p => truncate(p.name)),
       values: top.map(p => Math.round(p.normalised * 10) / 10),
     },
-    title: `Top ${topN} Friends by Affinity`,
+    title: t('chartTop', topN),
     titleFontSize: '1.2rem',
     roughness: 2.5,
     color: '#e94560',
@@ -74,8 +73,8 @@ function renderTopFriends(profiles, topN) {
     fillWeight: 2,
     stroke: 'white',
     strokeWidth: 0.8,
-    margin: { top: 50, right: 30, bottom: 50, left: 120 },
     padding: 0.15,
+    margin: { top: 50, right: 30, bottom: 50, left: 120 },
     font: 0,
     interactive: true,
   });
@@ -84,13 +83,14 @@ function renderTopFriends(profiles, topN) {
 function renderDonut(profiles) {
   const nActive = profiles.filter(p => p.active).length;
   const nInactive = profiles.length - nActive;
+  const labels = t('chartDonutL');
   new roughViz.Donut({
     element: '#chart-donut',
     data: {
-      labels: ['Active (+0.5 bonus)', 'Inactive'],
+      labels: labels,
       values: [nActive, nInactive],
     },
-    title: 'Active vs Inactive',
+    title: t('chartDonut'),
     titleFontSize: '1.2rem',
     roughness: 2,
     colors: ['#e94560', '#0f3460'],
@@ -105,23 +105,21 @@ function renderDonut(profiles) {
 }
 
 function renderTiers(profiles) {
-  const tiers = { '90-100': 0, '70-89': 0, '50-69': 0, '30-49': 0, '10-29': 0, '0-9': 0 };
+  const keys  = ['90-100', '70-89', '50-69', '30-49', '10-29', '0-9'];
+  const counts = [0, 0, 0, 0, 0, 0];
   for (const p of profiles) {
     const s = p.normalised;
-    if (s >= 90) tiers['90-100']++;
-    else if (s >= 70) tiers['70-89']++;
-    else if (s >= 50) tiers['50-69']++;
-    else if (s >= 30) tiers['30-49']++;
-    else if (s >= 10) tiers['10-29']++;
-    else tiers['0-9']++;
+    if (s >= 90)      counts[0]++;
+    else if (s >= 70) counts[1]++;
+    else if (s >= 50) counts[2]++;
+    else if (s >= 30) counts[3]++;
+    else if (s >= 10) counts[4]++;
+    else              counts[5]++;
   }
   new roughViz.Bar({
     element: '#chart-tiers',
-    data: {
-      labels: Object.keys(tiers),
-      values: Object.values(tiers),
-    },
-    title: 'Friends by Score Tier',
+    data: { labels: keys, values: counts },
+    title: t('chartTiers'),
     titleFontSize: '1.2rem',
     roughness: 2.5,
     color: '#533483',
@@ -137,7 +135,6 @@ function renderTiers(profiles) {
 }
 
 function renderDistribution(profiles) {
-  // Bucket scores into histogram bins
   const binCount = 20;
   const bins = new Array(binCount).fill(0);
   for (const p of profiles) {
@@ -148,7 +145,7 @@ function renderDistribution(profiles) {
   new roughViz.Bar({
     element: '#chart-dist',
     data: { labels, values: bins },
-    title: 'Score Distribution',
+    title: t('chartDist'),
     titleFontSize: '1.2rem',
     roughness: 2.5,
     color: '#e94560',
@@ -166,29 +163,29 @@ function renderDistribution(profiles) {
 function renderTable(profiles) {
   const container = document.getElementById('table-container');
   let html = `
-    <h2>Full Ranked List (${profiles.length} profiles)</h2>
+    <h2>${t('tableTitle', profiles.length)}</h2>
     <table>
       <thead>
         <tr>
-          <th>Rank</th>
-          <th>Name</th>
-          <th>Raw Base</th>
-          <th>Score</th>
-          <th>Active</th>
+          <th>${t('colRank')}</th>
+          <th>${t('colName')}</th>
+          <th>${t('colRaw')}</th>
+          <th>${t('colScore')}</th>
+          <th>${t('colActive')}</th>
         </tr>
       </thead>
       <tbody>
   `;
   for (let i = 0; i < profiles.length; i++) {
     const p = profiles[i];
-    const activeClass = p.active ? 'active-yes' : '';
+    const activeLabel = p.active ? (currentLang === 'zh' ? '是' : 'YES') : (currentLang === 'zh' ? '否' : 'NO');
     html += `
-      <tr class="${activeClass}">
+      <tr class="${p.active ? 'active-yes' : ''}">
         <td>${i + 1}</td>
         <td>${escapeHtml(p.name)}</td>
         <td>${p.rawBase.toFixed(6)}</td>
         <td>${p.normalised.toFixed(2)}</td>
-        <td>${p.active ? 'YES' : 'NO'}</td>
+        <td>${activeLabel}</td>
       </tr>`;
   }
   html += '</tbody></table>';
