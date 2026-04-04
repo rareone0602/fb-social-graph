@@ -140,16 +140,114 @@ document.getElementById('btn-export').addEventListener('click', () => {
   URL.revokeObjectURL(url);
 });
 
-// ── Share to Facebook ─────────────────────────────────────────────────────────
+// ── Share to Facebook (capture orbit graph → download PNG → open FB) ─────────
 
-window.shareToFacebook = function () {
-  const url = encodeURIComponent('https://rareone0602.github.io/fb-social-graph/');
-  window.open(
-    `https://www.facebook.com/sharer/sharer.php?u=${url}`,
-    '_blank',
-    'width=600,height=460,noopener'
-  );
+window.shareToFacebook = async function () {
+  const btn = document.getElementById('btn-share');
+  const origText = btn.textContent;
+  btn.textContent = currentLang === 'zh' ? '截圖中...' : 'Capturing...';
+  btn.disabled = true;
+
+  try {
+    const blob = await captureGraphAsPng();
+    if (blob) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.download = 'affinity_orbit.png';
+      a.href = url;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    }
+    // Small delay so the download starts, then open Facebook
+    setTimeout(() => window.open('https://www.facebook.com/', '_blank'), 600);
+  } catch (e) {
+    console.warn('Graph capture failed:', e);
+  }
+
+  btn.disabled = false;
+  btn.textContent = origText;
 };
+
+/**
+ * Capture the D3 orbit SVG as a high-res PNG.
+ * Resolves CSS custom properties so the exported image looks correct.
+ */
+async function captureGraphAsPng() {
+  const svg = document.querySelector('#chart-graph svg');
+  if (!svg) return null;
+
+  const clone = svg.cloneNode(true);
+  const cs = getComputedStyle(document.documentElement);
+
+  // Background
+  const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  bg.setAttribute('width', '100%');
+  bg.setAttribute('height', '100%');
+  bg.setAttribute('fill', cs.getPropertyValue('--bg-card').trim());
+  clone.insertBefore(bg, clone.firstChild);
+
+  // Title text
+  const title = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  title.setAttribute('x', '50%');
+  title.setAttribute('y', '28');
+  title.setAttribute('text-anchor', 'middle');
+  title.setAttribute('fill', cs.getPropertyValue('--accent').trim());
+  title.setAttribute('font-size', '18');
+  title.setAttribute('font-weight', 'bold');
+  title.setAttribute('font-family', "'Gaegu','Noto Sans TC',cursive");
+  title.textContent = t('graphTitle');
+  clone.appendChild(title);
+
+  // Resolve all var(--xxx) in attributes and inline styles
+  const resolve = str =>
+    str.replace(/var\(--([^)]+)\)/g, (_, n) => cs.getPropertyValue('--' + n).trim());
+
+  clone.querySelectorAll('*').forEach(el => {
+    for (const attr of [...el.attributes]) {
+      if (attr.value.includes('var(')) attr.value = resolve(attr.value);
+    }
+    const style = el.getAttribute('style');
+    if (style && style.includes('var(')) el.setAttribute('style', resolve(style));
+  });
+
+  // Inline CSS-class styles for labels (paint-order halo)
+  const textFill = cs.getPropertyValue('--text').trim();
+  const bgCard   = cs.getPropertyValue('--bg-card').trim();
+  clone.querySelectorAll('.node-label').forEach(el => {
+    el.setAttribute('fill', textFill);
+    el.setAttribute('stroke', bgCard);
+    el.setAttribute('stroke-width', '3');
+    el.setAttribute('stroke-linejoin', 'round');
+    el.setAttribute('paint-order', 'stroke fill');
+    el.setAttribute('font-family', "'Gaegu','Noto Sans TC',cursive");
+    el.setAttribute('font-size', '9');
+  });
+
+  // Set explicit pixel dimensions for the Image
+  const vb = svg.viewBox.baseVal;
+  clone.setAttribute('width',  vb.width);
+  clone.setAttribute('height', vb.height);
+
+  const svgStr = new XMLSerializer().serializeToString(clone);
+  const svgBlob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+  const imgUrl = URL.createObjectURL(svgBlob);
+
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width  = vb.width * 2;   // 2x for retina clarity
+      c.height = vb.height * 2;
+      const ctx = c.getContext('2d');
+      ctx.scale(2, 2);
+      ctx.drawImage(img, 0, 0);
+      URL.revokeObjectURL(imgUrl);
+      c.toBlob(b => resolve(b), 'image/png');
+    };
+    img.onerror = () => { URL.revokeObjectURL(imgUrl); resolve(null); };
+    img.src = imgUrl;
+  });
+}
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 
