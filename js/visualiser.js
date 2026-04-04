@@ -1,22 +1,24 @@
 /**
- * Renders roughViz charts and a ranked table from parsed profiles.
- * Uses window.t() for translated strings.
+ * roughViz charts + ranked table.
+ * Depends on: window.t() from i18n.js, window.currentLang from i18n.js
  */
 
 function truncate(name, max = 16) {
   return name.length > max ? name.slice(0, max - 2) + '..' : name;
 }
 
-function clearCharts() {
+window.clearCharts = function () {
   document.getElementById('charts').innerHTML = '';
   document.getElementById('table-container').innerHTML = '';
-}
+  document.getElementById('graph-section').style.display = 'none';
+  document.getElementById('table-controls').style.display = 'none';
+  d3.select('#d3-tooltip').remove();
+};
 
-function renderAll(profiles, topN = 30) {
+window.renderAll = function (profiles, topN = 30) {
   clearCharts();
-  const chartsEl = document.getElementById('charts');
 
-  chartsEl.innerHTML = `
+  document.getElementById('charts').innerHTML = `
     <div class="chart-row">
       <div class="chart-box chart-wide" id="chart-top"></div>
       <div class="chart-box" id="chart-donut"></div>
@@ -29,7 +31,6 @@ function renderAll(profiles, topN = 30) {
   `;
 
   renderStats(profiles);
-  renderTable(profiles);
 
   requestAnimationFrame(() => {
     renderTopFriends(profiles, topN);
@@ -37,7 +38,20 @@ function renderAll(profiles, topN = 30) {
     renderTiers(profiles);
     renderDistribution(profiles);
   });
-}
+
+  // D3 graph
+  const graphSection = document.getElementById('graph-section');
+  graphSection.style.display = 'block';
+  document.getElementById('graph-title').textContent = t('graphTitle');
+  renderGraph(profiles, topN);
+
+  // Table with search/export controls
+  document.getElementById('table-controls').style.display = 'flex';
+  document.getElementById('search-input').value = '';
+  document.getElementById('search-input').placeholder = t('searchPlaceholder');
+  document.getElementById('btn-export').textContent = t('btnExport');
+  renderTable(profiles);
+};
 
 function renderStats(profiles) {
   const n = profiles.length;
@@ -73,7 +87,7 @@ function renderTopFriends(profiles, topN) {
     fillWeight: 2,
     stroke: 'white',
     strokeWidth: 0.8,
-    padding: 0.15,
+    padding: 0.4,
     margin: { top: 50, right: 30, bottom: 50, left: 120 },
     font: 0,
     interactive: true,
@@ -82,13 +96,11 @@ function renderTopFriends(profiles, topN) {
 
 function renderDonut(profiles) {
   const nActive = profiles.filter(p => p.active).length;
-  const nInactive = profiles.length - nActive;
-  const labels = t('chartDonutL');
   new roughViz.Donut({
     element: '#chart-donut',
     data: {
-      labels: labels,
-      values: [nActive, nInactive],
+      labels: t('chartDonutL'),
+      values: [nActive, profiles.length - nActive],
     },
     title: t('chartDonut'),
     titleFontSize: '1.2rem',
@@ -105,11 +117,11 @@ function renderDonut(profiles) {
 }
 
 function renderTiers(profiles) {
-  const keys  = ['90-100', '70-89', '50-69', '30-49', '10-29', '0-9'];
+  const keys   = ['90-100', '70-89', '50-69', '30-49', '10-29', '0-9'];
   const counts = [0, 0, 0, 0, 0, 0];
   for (const p of profiles) {
     const s = p.normalised;
-    if (s >= 90)      counts[0]++;
+    if      (s >= 90) counts[0]++;
     else if (s >= 70) counts[1]++;
     else if (s >= 50) counts[2]++;
     else if (s >= 30) counts[3]++;
@@ -141,10 +153,9 @@ function renderDistribution(profiles) {
     const idx = Math.min(Math.floor(p.normalised / (100 / binCount)), binCount - 1);
     bins[idx]++;
   }
-  const labels = bins.map((_, i) => `${i * (100 / binCount)}`);
   new roughViz.Bar({
     element: '#chart-dist',
-    data: { labels, values: bins },
+    data: { labels: bins.map((_, i) => `${i * (100 / binCount)}`), values: bins },
     title: t('chartDist'),
     titleFontSize: '1.2rem',
     roughness: 2.5,
@@ -160,40 +171,40 @@ function renderDistribution(profiles) {
   });
 }
 
-function renderTable(profiles) {
+window.renderTable = function (profiles) {
   const container = document.getElementById('table-container');
-  let html = `
-    <h2>${t('tableTitle', profiles.length)}</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>${t('colRank')}</th>
-          <th>${t('colName')}</th>
-          <th>${t('colRaw')}</th>
-          <th>${t('colScore')}</th>
-          <th>${t('colActive')}</th>
-        </tr>
-      </thead>
-      <tbody>
-  `;
+  let rows = '';
   for (let i = 0; i < profiles.length; i++) {
     const p = profiles[i];
-    const activeLabel = p.active ? (currentLang === 'zh' ? '是' : 'YES') : (currentLang === 'zh' ? '否' : 'NO');
-    html += `
-      <tr class="${p.active ? 'active-yes' : ''}">
-        <td>${i + 1}</td>
-        <td>${escapeHtml(p.name)}</td>
-        <td>${p.rawBase.toFixed(6)}</td>
-        <td>${p.normalised.toFixed(2)}</td>
-        <td>${activeLabel}</td>
-      </tr>`;
+    const activeLabel = p.active ? t('activeYes') : t('activeNo');
+    rows += `<tr class="${p.active ? 'active-yes' : ''}" data-name="${p.name.toLowerCase()}">
+      <td>${i + 1}</td>
+      <td>${escapeHtml(p.name)}</td>
+      <td>${p.rawBase.toFixed(6)}</td>
+      <td>${p.normalised.toFixed(2)}</td>
+      <td>${activeLabel}</td>
+    </tr>`;
   }
-  html += '</tbody></table>';
-  container.innerHTML = html;
+  container.innerHTML = `
+    <h2>${t('tableTitle', profiles.length)}</h2>
+    <table>
+      <thead><tr>
+        <th>${t('colRank')}</th><th>${t('colName')}</th>
+        <th>${t('colRaw')}</th><th>${t('colScore')}</th><th>${t('colActive')}</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+
+  updateSearchCount(profiles.length);
+};
+
+function updateSearchCount(n) {
+  const el = document.getElementById('search-count');
+  if (el) el.textContent = t('searchCount', n);
 }
 
 function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
 }
