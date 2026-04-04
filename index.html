@@ -15,9 +15,8 @@
 </head>
 <body>
 
-  <!-- Controls: theme + language + share -->
+  <!-- Controls: theme + language -->
   <div id="controls">
-    <button class="btn-share" id="btn-share" onclick="shareToFacebook()" data-i18n="btnShare">Share on Facebook</button>
     <div class="toggle-pill" id="theme-toggle">
       <button id="btn-theme-dark"  onclick="applyTheme('dark')"  data-i18n="btnThemeDark">Dark</button>
       <button id="btn-theme-light" onclick="applyTheme('light')" data-i18n="btnThemeLight">Light</button>
@@ -102,6 +101,7 @@
     <input type="text" id="search-input" placeholder="Search friends..." />
     <span id="search-count"></span>
     <button class="btn-export" id="btn-export">Export CSV</button>
+    <button class="btn-share" id="btn-share" onclick="shareToFacebook()" data-i18n="btnShare">Share on Facebook</button>
   </div>
 
   <!-- Ranked table -->
