@@ -140,32 +140,62 @@ document.getElementById('btn-export').addEventListener('click', () => {
   URL.revokeObjectURL(url);
 });
 
-// ── Share to Facebook (capture orbit graph → download PNG → open FB) ─────────
+// ── Share graph (native share → clipboard → download fallback) ───────────────
 
-window.shareToFacebook = async function () {
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+window.shareGraph = async function () {
   const btn = document.getElementById('btn-share');
   const origText = btn.textContent;
-  btn.textContent = currentLang === 'zh' ? '截圖中...' : 'Capturing...';
+  btn.textContent = currentLang === 'zh' ? '擷取中...' : 'Capturing...';
   btn.disabled = true;
 
   try {
     const blob = await captureGraphAsPng();
-    if (blob) {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.download = 'affinity_orbit.png';
-      a.href = url;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 2000);
-    }
-    // Small delay so the download starts, then open Facebook
-    setTimeout(() => window.open('https://www.facebook.com/', '_blank'), 600);
-  } catch (e) {
-    console.warn('Graph capture failed:', e);
-  }
+    if (!blob) { showToast(t('toastFailed')); return; }
 
-  btn.disabled = false;
-  btn.textContent = origText;
+    const file = new File([blob], 'affinity_orbit.png', { type: 'image/png' });
+
+    // 1. Try native share sheet (works on mobile, some desktops)
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({
+        title: t('graphTitle'),
+        files: [file],
+      });
+      return;
+    }
+
+    // 2. Try copy to clipboard
+    if (typeof ClipboardItem !== 'undefined') {
+      await navigator.clipboard.write([
+        new ClipboardItem({ 'image/png': blob }),
+      ]);
+      showToast(t('toastCopied'));
+      return;
+    }
+
+    // 3. Fallback: download
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.download = 'affinity_orbit.png';
+    a.href = url;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    showToast(t('toastSaved'));
+
+  } catch (e) {
+    // User may have cancelled the native share sheet — that's fine
+    if (e.name !== 'AbortError') console.warn('Share failed:', e);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = origText;
+  }
 };
 
 /**

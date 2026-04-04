@@ -402,12 +402,12 @@ text.node-label {
   border: none;
   border-radius: 20px;
   cursor: pointer;
-  background: #1877f2;
+  background: var(--accent);
   color: #fff;
   transition: background 0.2s;
   white-space: nowrap;
 }
-.btn-share:hover { background: #1256b0; }
+.btn-share:hover { background: var(--accent-hover); }
 
 #d3-tooltip {
   position: absolute;
@@ -534,3 +534,31 @@ footer {
 }
 
 footer a { color: var(--accent); }
+
+/* ═══════════════════════════════════════════════════════════
+   Toast notification
+   ═══════════════════════════════════════════════════════════ */
+#toast {
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 0.7rem 1.4rem;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-family: 'Gaegu', 'Noto Sans TC', cursive;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s, transform 0.3s;
+  z-index: 9999;
+  white-space: nowrap;
+}
+#toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  pointer-events: auto;
+}

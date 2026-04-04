@@ -54,7 +54,10 @@ window.TRANSLATIONS = {
     searchPlaceholder:'Search friends...',
     searchCount:      n => `${n} result${n === 1 ? '' : 's'}`,
     btnExport:        'Export CSV',
-    btnShare:         'Share on Facebook',
+    btnShare:         'Share Graph',
+    toastCopied:      'Copied to clipboard — paste it anywhere!',
+    toastSaved:       'Image saved to downloads.',
+    toastFailed:      'Could not capture graph.',
   },
   zh: {
     title:            'FB 社交圖譜視覺化',
@@ -104,7 +107,10 @@ window.TRANSLATIONS = {
     searchPlaceholder:'搜尋好友...',
     searchCount:      n => `${n} 筆結果`,
     btnExport:        '匯出 CSV',
-    btnShare:         '分享到 Facebook',
+    btnShare:         '分享圖表',
+    toastCopied:      '已複製到剪貼簿——貼到任何地方分享！',
+    toastSaved:       '圖片已儲存。',
+    toastFailed:      '無法擷取圖表。',
   },
 };
 

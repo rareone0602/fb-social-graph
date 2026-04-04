@@ -101,11 +101,13 @@
     <input type="text" id="search-input" placeholder="Search friends..." />
     <span id="search-count"></span>
     <button class="btn-export" id="btn-export">Export CSV</button>
-    <button class="btn-share" id="btn-share" onclick="shareToFacebook()" data-i18n="btnShare">Share on Facebook</button>
+    <button class="btn-share" id="btn-share" onclick="shareGraph()" data-i18n="btnShare">Share Graph</button>
   </div>
 
   <!-- Ranked table -->
   <div id="table-container"></div>
+
+  <div id="toast"></div>
 
   <footer>
     FB Social Graph Visualiser &middot; Built with
