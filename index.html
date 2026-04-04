@@ -6,11 +6,18 @@
   <title>FB Social Graph Visualiser</title>
   <link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
+  <!-- Open Graph for Facebook link preview -->
+  <meta property="og:title"       content="FB Social Graph Visualiser" />
+  <meta property="og:description" content="See how Facebook's ML ranks your friends — 100% client-side, nothing leaves your browser." />
+  <meta property="og:image"       content="https://rareone0602.github.io/fb-social-graph/preview.png" />
+  <meta property="og:url"         content="https://rareone0602.github.io/fb-social-graph/" />
+  <meta property="og:type"        content="website" />
 </head>
 <body>
 
-  <!-- Controls: theme + language -->
+  <!-- Controls: theme + language + share -->
   <div id="controls">
+    <button class="btn-share" id="btn-share" onclick="shareToFacebook()" data-i18n="btnShare">Share on Facebook</button>
     <div class="toggle-pill" id="theme-toggle">
       <button id="btn-theme-dark"  onclick="applyTheme('dark')"  data-i18n="btnThemeDark">Dark</button>
       <button id="btn-theme-light" onclick="applyTheme('light')" data-i18n="btnThemeLight">Light</button>

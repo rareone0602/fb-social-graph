@@ -140,7 +140,21 @@ document.getElementById('btn-export').addEventListener('click', () => {
   URL.revokeObjectURL(url);
 });
 
+// ── Share to Facebook ─────────────────────────────────────────────────────────
+
+window.shareToFacebook = function () {
+  const url = encodeURIComponent('https://rareone0602.github.io/fb-social-graph/');
+  window.open(
+    `https://www.facebook.com/sharer/sharer.php?u=${url}`,
+    '_blank',
+    'width=600,height=460,noopener'
+  );
+};
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 
 initTheme();
 applyLang();
+// Translate share button on init
+const btnShare = document.getElementById('btn-share');
+if (btnShare) btnShare.textContent = t('btnShare');

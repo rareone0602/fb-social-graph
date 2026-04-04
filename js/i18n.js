@@ -9,9 +9,9 @@ window.TRANSLATIONS = {
   en: {
     title:            'FB Social Graph Visualiser',
     subtitle:         "See how Facebook's ML ranks your friends — 100% client-side, nothing leaves your browser.",
-    step1:            'Go to <strong>facebook.com</strong>',
+    step1:            'Go to <a href="https://www.facebook.com" target="_blank" rel="noopener noreferrer"><strong>facebook.com</strong></a>',
     step2:            'Press <strong>Ctrl+U</strong> to view source',
-    step3:            '<strong>Select all</strong> &amp; paste below',
+    step3:            '<strong>Ctrl+A</strong> select all, <strong>Ctrl+C</strong> copy, then paste below',
     placeholder:      'Paste your Facebook page source here (Ctrl+V)...',
     btnAnalyse:       'Analyse',
     btnParsing:       'Parsing...',
@@ -54,13 +54,14 @@ window.TRANSLATIONS = {
     searchPlaceholder:'Search friends...',
     searchCount:      n => `${n} result${n === 1 ? '' : 's'}`,
     btnExport:        'Export CSV',
+    btnShare:         'Share on Facebook',
   },
   zh: {
     title:            'FB 社交圖譜視覺化',
     subtitle:         'Facebook 的 ML 如何排名你的朋友——100% 瀏覽器本地運算，資料絕不離開你的裝置。',
-    step1:            '前往 <strong>facebook.com</strong>',
+    step1:            '前往 <a href="https://www.facebook.com" target="_blank" rel="noopener noreferrer"><strong>facebook.com</strong></a>',
     step2:            '按下 <strong>Ctrl+U</strong> 查看網頁原始碼',
-    step3:            '<strong>全選</strong>後貼上到下方',
+    step3:            '<strong>Ctrl+A</strong> 全選，<strong>Ctrl+C</strong> 複製後貼上到下方',
     placeholder:      '將 Facebook 網頁原始碼貼到此處（Ctrl+V）...',
     btnAnalyse:       '分析',
     btnParsing:       '解析中...',
@@ -103,6 +104,7 @@ window.TRANSLATIONS = {
     searchPlaceholder:'搜尋好友...',
     searchCount:      n => `${n} 筆結果`,
     btnExport:        '匯出 CSV',
+    btnShare:         '分享到 Facebook',
   },
 };
 
