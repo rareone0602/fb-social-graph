@@ -209,6 +209,10 @@ async function captureGraphAsPng() {
   const clone = svg.cloneNode(true);
   const cs = getComputedStyle(document.documentElement);
 
+  // Remove external <image> elements (Facebook CDN blocks CORS, tainting the canvas).
+  // The colored circle fallbacks underneath will show through instead.
+  clone.querySelectorAll('image').forEach(img => img.remove());
+
   // Background
   const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
   bg.setAttribute('width', '100%');
