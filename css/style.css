@@ -301,6 +301,7 @@ button {
 }
 
 .chart-wide { flex: 2; min-width: 500px; min-height: 920px; }
+.chart-full { flex: 1 1 100%; min-width: 300px; }
 
 .chart-box svg text {
   fill: var(--text) !important;
@@ -521,6 +522,27 @@ tbody td {
 tbody tr:hover { background: var(--bg-card); }
 tr.active-yes td:last-child { color: var(--accent); font-weight: 700; }
 tr.hidden { display: none; }
+
+.td-name { display: flex; align-items: center; gap: 0.5rem; }
+
+.table-avatar {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid var(--border-sub);
+}
+
+.profile-link {
+  color: var(--text);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.profile-link:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
 
 /* ═══════════════════════════════════════════════════════════
    Footer

@@ -83,7 +83,7 @@ btnAnalyse.addEventListener('click', () => {
       } else {
         window._lastProfiles = profiles;
         renderAll(profiles);
-        document.getElementById('charts').scrollIntoView({ behavior: 'smooth' });
+        document.getElementById('graph-section').scrollIntoView({ behavior: 'smooth' });
       }
     } catch (e) {
       errorEl.textContent = t('errorParse') + e.message;

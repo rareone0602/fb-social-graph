@@ -41,6 +41,8 @@ function parseBootstrapKeywords(payloads) {
 
     const profileId = navResult.ent_id || 'N/A';
     const profileName = navResult.title || keyword;
+    const imgUrl = navResult.img_url || '';
+    const linkUrl = navResult.link_url || `https://www.facebook.com/profile.php?id=${profileId}`;
 
     let f16173 = 0, f16174 = 0;
     const loggingStr = node.item_logging_info;
@@ -53,7 +55,7 @@ function parseBootstrapKeywords(payloads) {
     }
 
     if (!(profileId in dossier) || f16173 > dossier[profileId].f16173) {
-      dossier[profileId] = { name: profileName, f16173, f16174 };
+      dossier[profileId] = { name: profileName, f16173, f16174, imgUrl, linkUrl };
     }
   }
 
@@ -118,6 +120,8 @@ function normalise(dossier) {
     rawMultiplier: p.f16174,
     normalised: ((p.f16173 - minBase) / spread) * 100,
     active: p.f16174 > (p.f16173 / 2) + 0.4,
+    imgUrl: p.imgUrl || '',
+    linkUrl: p.linkUrl || `https://www.facebook.com/profile.php?id=${pid}`,
   }));
 
   profiles.sort((a, b) => b.rawBase - a.rawBase);
@@ -134,11 +138,20 @@ function parseFacebookSource(rawHtml) {
   const doc = new DOMParser().parseFromString(rawHtml, 'text/html');
   const html = doc.documentElement.outerHTML;
 
+  // Extract the logged-in user's own ID so we can exclude them
+  const selfMatch = html.match(/"USER_ID":"(\d+)"/);
+  const selfId = selfMatch ? selfMatch[1] : null;
+
   const payloads = extractScriptPayloads(html);
   let dossier = parseBootstrapKeywords(payloads);
 
   if (Object.keys(dossier).length === 0) {
     dossier = parseInboxTray(html);
+  }
+
+  // Remove the user's own profile from results
+  if (selfId && selfId in dossier) {
+    delete dossier[selfId];
   }
 
   if (Object.keys(dossier).length === 0) {
