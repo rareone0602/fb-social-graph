@@ -38,6 +38,10 @@ window.renderGraph = function (profiles, topN = 50) {
     targetRadius: 55 + (1 - p.normalised / 100) * (MAX_ORBIT - 55),
   }));
 
+  // Virtual center node (pinned "You") for link forces
+  const centerNode = { id: 'center', fx: cx, fy: cy };
+  const allNodes = [centerNode, ...nodes];
+
   // Build name→node lookup for imported edges
   const nodeByName = new Map();
   nodes.forEach(n => nodeByName.set(n.name.toLowerCase(), n));
@@ -62,9 +66,20 @@ window.renderGraph = function (profiles, topN = 50) {
     .attr('fill', 'var(--accent)')
     .attr('opacity', 0.5);
 
-  // Arrowhead marker for imported friend → friend edges
+  // Arrowhead markers for imported edges (active vs inactive)
   defs.append('marker')
-    .attr('id', 'arrow-import')
+    .attr('id', 'arrow-import-active')
+    .attr('viewBox', '0 0 10 6')
+    .attr('refX', 10).attr('refY', 3)
+    .attr('markerWidth', 8).attr('markerHeight', 6)
+    .attr('orient', 'auto')
+    .append('path')
+    .attr('d', 'M0,0 L10,3 L0,6 Z')
+    .attr('fill', 'var(--accent)')
+    .attr('opacity', 0.7);
+
+  defs.append('marker')
+    .attr('id', 'arrow-import-inactive')
     .attr('viewBox', '0 0 10 6')
     .attr('refX', 10).attr('refY', 3)
     .attr('markerWidth', 8).attr('markerHeight', 6)
@@ -127,11 +142,11 @@ window.renderGraph = function (profiles, topN = 50) {
     .data(importedEdges).enter()
     .append('line')
     .attr('class', 'import-link')
-    .attr('stroke', 'var(--accent2)')
-    .attr('stroke-opacity', 0.5)
+    .attr('stroke', d => d.active ? 'var(--accent)' : 'var(--accent2)')
+    .attr('stroke-opacity', d => d.active ? 0.6 : 0.5)
     .attr('stroke-width', 1.5)
     .attr('stroke-dasharray', '6 3')
-    .attr('marker-end', 'url(#arrow-import)');
+    .attr('marker-end', d => d.active ? 'url(#arrow-import-active)' : 'url(#arrow-import-inactive)');
 
   // Friend node groups
   const nodeG = svg.selectAll('g.friend-node')
@@ -293,10 +308,25 @@ window.renderGraph = function (profiles, topN = 50) {
     return { x: x1 + dx * ratio, y: y1 + dy * ratio };
   }
 
-  const simulation = d3.forceSimulation(nodes)
-    .force('radial',    d3.forceRadial(d => d.targetRadius, cx, cy).strength(0.75))
-    .force('charge',    d3.forceManyBody().strength(-18))
-    .force('collision', d3.forceCollide(d => d.r + 16))
+  // Build link data for physics: center→friend + imported friend→friend
+  const simLinks = nodes.map(n => ({
+    source: centerNode,
+    target: n,
+    strength: 0.08 + (n.normalised / 100) * 0.12,
+  }));
+  for (const e of importedEdges) {
+    simLinks.push({
+      source: e.sourceNode,
+      target: e.targetNode,
+      strength: 0.05,
+    });
+  }
+
+  const simulation = d3.forceSimulation(allNodes)
+    .force('radial',    d3.forceRadial(d => d.targetRadius || 0, cx, cy).strength(d => d === centerNode ? 0 : 0.3 + (d.normalised / 100) * 0.5))
+    .force('link',      d3.forceLink(simLinks).strength(d => d.strength).distance(d => d.target.targetRadius || 120))
+    .force('charge',    d3.forceManyBody().strength(d => d === centerNode ? 0 : -25))
+    .force('collision', d3.forceCollide(d => d === centerNode ? 0 : d.r + 14))
     .on('tick', () => {
       // User → friend edges: shorten to stop at node edge
       userLinks.each(function (d) {

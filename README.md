@@ -52,3 +52,7 @@ These scores influence more than just search:
 ## Privacy
 
 All parsing happens locally in your browser. No data is sent to any server.
+
+## Acknowledgements
+
+Thanks to [Yuda](https://github.com/Yuda) and [Axun0402](https://github.com/Axun0402) for help with testing.
