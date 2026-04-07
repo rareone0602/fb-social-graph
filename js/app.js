@@ -127,9 +127,9 @@ document.getElementById('btn-export').addEventListener('click', () => {
   const profiles = window._lastProfiles;
   if (!profiles) return;
 
-  const header = ['Rank', 'Name', 'Raw Base', 'Score (0-100)', 'Active'].join(',');
+  const header = ['Rank', 'Name', 'Profile ID', 'Raw Base', 'Score (0-100)', 'Active'].join(',');
   const rows = profiles.map((p, i) =>
-    [i + 1, `"${p.name.replace(/"/g, '""')}"`, p.rawBase.toFixed(6), p.normalised.toFixed(2), p.active ? 'YES' : 'NO'].join(',')
+    [i + 1, `"${p.name.replace(/"/g, '""')}"`, p.profileId || '', p.rawBase.toFixed(6), p.normalised.toFixed(2), p.active ? 'YES' : 'NO'].join(',')
   );
   const csv = [header, ...rows].join('\n');
 
@@ -140,6 +140,141 @@ document.getElementById('btn-export').addEventListener('click', () => {
   a.download = 'fb_social_graph.csv';
   a.click();
   URL.revokeObjectURL(url);
+});
+
+// ── Import CSV ────────────────────────────────────────────────────────────────
+
+/**
+ * Parse a single CSV line, handling quoted fields that may contain commas.
+ */
+function parseCsvLine(line) {
+  const cols = [];
+  let cur = '', inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') {
+      if (inQ && line[i + 1] === '"') { cur += '"'; i++; }
+      else inQ = !inQ;
+    } else if (c === ',' && !inQ) {
+      cols.push(cur); cur = '';
+    } else {
+      cur += c;
+    }
+  }
+  cols.push(cur);
+  return cols;
+}
+
+/**
+ * Parse a CSV exported by this app into an array of profile objects.
+ * Tolerates missing columns (Profile ID, Raw Base) for forward compat.
+ */
+function parseCsvImport(csvText) {
+  const lines = csvText.trim().split(/\r?\n/);
+  if (lines.length < 2) return null;
+
+  const header = parseCsvLine(lines[0]).map(h => h.trim().toLowerCase().replace(/['"]/g, ''));
+  const col = name => header.findIndex(h => h === name);
+
+  const iName     = col('name');
+  const iId       = header.findIndex(h => h.includes('profile id') || h === 'profileid');
+  const iRaw      = header.findIndex(h => h.includes('raw'));
+  const iScore    = header.findIndex(h => h.includes('score'));
+  const iActive   = col('active');
+
+  if (iName === -1 || iScore === -1) return null; // unrecognised format
+
+  const profiles = [];
+  for (let i = 1; i < lines.length; i++) {
+    if (!lines[i].trim()) continue;
+    const c = parseCsvLine(lines[i]);
+
+    const name      = (c[iName]   || '').trim();
+    const profileId = iId    >= 0 ? (c[iId]    || '').trim() : '';
+    const rawBase   = iRaw   >= 0 ? parseFloat(c[iRaw])   || 0 : 0;
+    const score     = iScore >= 0 ? parseFloat(c[iScore])  || 0 : 0;
+    const active    = iActive >= 0 ? (c[iActive] || '').trim().toUpperCase() === 'YES' : false;
+
+    if (!name) continue;
+
+    profiles.push({
+      name,
+      profileId,
+      // If rawBase is absent, derive a proxy from score so re-normalisation works
+      rawBase: rawBase || score / 100,
+      rawMultiplier: 0,
+      normalised: score,
+      active,
+      imgUrl: '',
+      linkUrl: profileId ? `https://www.facebook.com/profile.php?id=${profileId}` : '',
+    });
+  }
+
+  return profiles.length ? profiles : null;
+}
+
+/**
+ * Merge imported profiles into existing ones and re-render.
+ * Match priority: profileId > name (case-insensitive).
+ * Imported data overrides on conflict; existing imgUrl/linkUrl are preserved.
+ */
+function applyImport(imported) {
+  const existing = window._lastProfiles ? [...window._lastProfiles] : [];
+
+  for (const imp of imported) {
+    const idx = existing.findIndex(e =>
+      (imp.profileId && imp.profileId === e.profileId) ||
+      e.name.toLowerCase() === imp.name.toLowerCase()
+    );
+    if (idx >= 0) {
+      existing[idx] = {
+        ...existing[idx],
+        rawBase:  imp.rawBase  || existing[idx].rawBase,
+        active:   imp.active,
+        // Keep richer metadata from the parsed-HTML version when available
+        imgUrl:  existing[idx].imgUrl  || imp.imgUrl,
+        linkUrl: existing[idx].linkUrl || imp.linkUrl,
+      };
+    } else {
+      existing.push(imp);
+    }
+  }
+
+  // Re-normalise rawBase across the combined set
+  const bases = existing.map(p => p.rawBase).filter(b => b > 0);
+  if (bases.length) {
+    const minB = Math.min(...bases), maxB = Math.max(...bases);
+    const spread = maxB > minB ? maxB - minB : 1;
+    for (const p of existing) {
+      p.normalised = p.rawBase > 0 ? ((p.rawBase - minB) / spread) * 100 : 0;
+    }
+  }
+
+  existing.sort((a, b) => b.rawBase - a.rawBase);
+  window._lastProfiles = existing;
+  renderAll(existing);
+  document.getElementById('graph-section').scrollIntoView({ behavior: 'smooth' });
+  showToast(t('toastImported', imported.length));
+}
+
+function triggerCsvImport() {
+  document.getElementById('csv-file-input').click();
+}
+
+document.getElementById('btn-import').addEventListener('click', triggerCsvImport);
+document.getElementById('btn-import-merge').addEventListener('click', triggerCsvImport);
+
+document.getElementById('csv-file-input').addEventListener('change', function () {
+  const file = this.files[0];
+  if (!file) return;
+  this.value = ''; // reset so the same file can be re-imported
+  const reader = new FileReader();
+  reader.onload = e => {
+    const imported = parseCsvImport(e.target.result);
+    if (!imported) { showToast(t('toastImportErr')); return; }
+    applyImport(imported);
+  };
+  reader.readAsText(file, 'utf-8');
 });
 
 // ── Share graph (native share → clipboard → download fallback) ───────────────

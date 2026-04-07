@@ -56,10 +56,13 @@ window.TRANSLATIONS = {
     searchPlaceholder: 'Search friends...',
     searchCount: n => `${n} result${n === 1 ? '' : 's'}`,
     btnExport: 'Export CSV',
+    btnImport: 'Import CSV',
     btnShare: 'Share Graph',
     toastCopied: 'Copied to clipboard — paste it anywhere!',
     toastSaved: 'Image saved to downloads.',
     toastFailed: 'Could not capture graph.',
+    toastImported: n => `Imported ${n} profile${n === 1 ? '' : 's'} — graph updated.`,
+    toastImportErr: 'Could not parse CSV. Make sure it was exported from this app.',
   },
   zh: {
     tabTitle: 'FB 社交圖譜視覺化',
@@ -111,10 +114,13 @@ window.TRANSLATIONS = {
     searchPlaceholder: '搜尋好友...',
     searchCount: n => `${n} 筆結果`,
     btnExport: '匯出 CSV',
+    btnImport: '匯入 CSV',
     btnShare: '分享圖表',
     toastCopied: '已複製到剪貼簿——貼到任何地方分享！',
     toastSaved: '圖片已儲存。',
     toastFailed: '無法擷取圖表。',
+    toastImported: n => `已匯入 ${n} 位好友——圖表已更新。`,
+    toastImportErr: '無法解析 CSV，請確認是由本工具匯出的檔案。',
   },
 };
 

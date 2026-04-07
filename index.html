@@ -60,7 +60,9 @@
     <div class="btn-row">
       <button class="btn-primary" id="btn-analyse" disabled data-i18n="btnAnalyse">Analyse</button>
       <button class="btn-secondary" id="btn-clear" data-i18n="btnClear">Clear</button>
+      <button class="btn-secondary" id="btn-import" data-i18n="btnImport">Import CSV</button>
     </div>
+    <input type="file" id="csv-file-input" accept=".csv" hidden>
 
     <div class="error-msg" id="error-msg"></div>
     <div class="privacy-note" data-i18n="privacy">
@@ -109,6 +111,7 @@
     <input type="text" id="search-input" placeholder="Search friends..." />
     <span id="search-count"></span>
     <button class="btn-export" id="btn-export">Export CSV</button>
+    <button class="btn-secondary" id="btn-import-merge" data-i18n="btnImport">Import CSV</button>
     <button class="btn-share" id="btn-share" onclick="shareGraph()" data-i18n="btnShare">Share Graph</button>
   </div>
 
