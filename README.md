@@ -55,4 +55,4 @@ All parsing happens locally in your browser. No data is sent to any server.
 
 ## Acknowledgements
 
-Thanks to [Yuda](https://github.com/Yuda) and [Axun0402](https://github.com/Axun0402) for help with testing.
+Thanks to Yuda and [GANSOONLEE](https://github.com/GANSOONLEE) for help with testing.
