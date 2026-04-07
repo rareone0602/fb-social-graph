@@ -3,10 +3,11 @@
  * Exposes: window.currentLang, window.t(), window.applyLang()
  */
 
-window.currentLang = 'en';
+window.currentLang = 'zh';
 
 window.TRANSLATIONS = {
   en: {
+    tabTitle: 'FB Social Graph Visualiser',
     title: 'FB Social Graph Visualiser',
     subtitle: "See how Facebook's ML ranks your friends",
     step1: 'Go to <a href="https://www.facebook.com" target="_blank" rel="noopener noreferrer"><strong>facebook.com</strong></a>',
@@ -61,6 +62,7 @@ window.TRANSLATIONS = {
     toastFailed: 'Could not capture graph.',
   },
   zh: {
+    tabTitle: 'FB 社交圖譜視覺化',
     title: 'FB 社交圖譜視覺化',
     subtitle: 'Facebook 的 ML 如何排名你的朋友',
     step1: '前往 <a href="https://www.facebook.com" target="_blank" rel="noopener noreferrer"><strong>facebook.com</strong></a>',
@@ -123,6 +125,7 @@ window.t = function (key, ...args) {
 
 window.applyLang = function () {
   document.documentElement.lang = currentLang === 'zh' ? 'zh-TW' : 'en';
+  document.title = t('tabTitle');
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.dataset.i18n;
     if (TRANSLATIONS[currentLang][key] !== undefined) el.innerHTML = t(key);

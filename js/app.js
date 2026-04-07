@@ -38,6 +38,7 @@ function initTheme() {
 
 window.setLang = function (lang) {
   currentLang = lang;
+  localStorage.setItem('fb-sg-lang', lang);
   document.getElementById('btn-en').classList.toggle('active', lang === 'en');
   document.getElementById('btn-zh').classList.toggle('active', lang === 'zh');
   applyLang();
@@ -283,10 +284,23 @@ async function captureGraphAsPng() {
   });
 }
 
+// ── Language init ─────────────────────────────────────────────────────────────
+
+function initLang() {
+  const saved = localStorage.getItem('fb-sg-lang');
+  if (saved) {
+    setLang(saved);
+    return;
+  }
+  // Detect browser language; fall back to zh if not clearly English
+  const browserLang = (navigator.language || navigator.userLanguage || '').toLowerCase();
+  setLang(browserLang.startsWith('en') ? 'en' : 'zh');
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 
 initTheme();
-applyLang();
+initLang();
 // Translate share button on init
 const btnShare = document.getElementById('btn-share');
 if (btnShare) btnShare.textContent = t('btnShare');
