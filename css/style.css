@@ -348,14 +348,6 @@ button {
   margin: 0 auto 2rem;
   padding: 0 1rem;
   display: none;
-  transition: transform 0.35s ease, max-width 0.35s ease;
-  transform-origin: top center;
-}
-
-#graph-section:hover {
-  transform: scale(1.06);
-  z-index: 10;
-  position: relative;
 }
 
 #graph-section h2 {

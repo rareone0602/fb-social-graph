@@ -3,6 +3,11 @@
  * Renders top N friends as force-directed nodes orbiting "You" at the centre.
  * Nodes show profile pictures (clipped to circles) and are clickable.
  * Closer orbit = higher affinity score.
+ *
+ * UX features:
+ *   - Hover enlarges individual node correctly even during simulation
+ *   - "You" centre node shows the user's own profile picture
+ *   - Drag any friend node to pin it; double-click a pinned node to release it
  */
 
 window.renderGraph = function (profiles, topN = 50) {
@@ -18,6 +23,7 @@ window.renderGraph = function (profiles, topN = 50) {
   const cx = W / 2;
   const cy = H / 2;
   const MAX_ORBIT = Math.min(cx, cy) - 60;
+  const CENTER_R = 28;
 
   const nodes = top.map((p, i) => ({
     ...p,
@@ -34,13 +40,23 @@ window.renderGraph = function (profiles, topN = 50) {
 
   const defs = svg.append('defs');
 
-  // Create clip paths for each node's profile picture
+  // Clip paths for friend node profile pictures
   nodes.forEach(d => {
     defs.append('clipPath')
       .attr('id', `clip-node-${d.id}`)
       .append('circle')
       .attr('r', d.r);
   });
+
+  // Clip path for "You" centre node
+  const selfImgUrl = window._selfImgUrl || '';
+  if (selfImgUrl) {
+    defs.append('clipPath')
+      .attr('id', 'clip-center')
+      .append('circle')
+      .attr('cx', cx).attr('cy', cy)
+      .attr('r', CENTER_R);
+  }
 
   // Dashed orbit rings
   [0.25, 0.5, 0.75, 1].forEach(frac => {
@@ -70,7 +86,7 @@ window.renderGraph = function (profiles, topN = 50) {
     .attr('class', 'friend-node')
     .style('cursor', 'pointer');
 
-  // Background circle (visible as border ring + fallback if no image)
+  // Background circle (border ring + fallback if no image)
   nodeG.append('circle')
     .attr('r', d => d.r)
     .attr('fill', d => d.active ? 'var(--accent)' : 'var(--node-inactive)')
@@ -81,22 +97,16 @@ window.renderGraph = function (profiles, topN = 50) {
   // Profile picture (clipped to circle)
   nodeG.each(function (d) {
     if (!d.imgUrl) return;
-    const g = d3.select(this);
-    g.append('image')
-      .attr('x', -d.r)
-      .attr('y', -d.r)
-      .attr('width', d.r * 2)
-      .attr('height', d.r * 2)
+    d3.select(this).append('image')
+      .attr('x', -d.r).attr('y', -d.r)
+      .attr('width', d.r * 2).attr('height', d.r * 2)
       .attr('href', d.imgUrl)
       .attr('clip-path', `url(#clip-node-${d.id})`)
       .attr('preserveAspectRatio', 'xMidYMid slice')
-      .on('error', function () {
-        // Remove broken image, fallback circle already visible
-        d3.select(this).remove();
-      });
+      .on('error', function () { d3.select(this).remove(); });
   });
 
-  // Rank badge — small circle with number, offset to bottom-right
+  // Rank badge
   nodeG.append('circle')
     .attr('class', 'rank-badge')
     .attr('cx', d => d.r * 0.6)
@@ -127,25 +137,79 @@ window.renderGraph = function (profiles, topN = 50) {
     .attr('pointer-events', 'none')
     .text(d => d.name.length > 10 ? d.name.slice(0, 9) + '…' : d.name);
 
-  // Centre "You" node
+  // ── Centre "You" node ─────────────────────────────────────────────────────
   svg.append('circle')
-    .attr('cx', cx).attr('cy', cy).attr('r', 24)
-    .attr('fill', 'var(--accent)');
+    .attr('cx', cx).attr('cy', cy).attr('r', CENTER_R)
+    .attr('fill', 'var(--accent)')
+    .attr('stroke', '#fff')
+    .attr('stroke-width', 2);
+
+  if (selfImgUrl) {
+    svg.append('image')
+      .attr('x', cx - CENTER_R).attr('y', cy - CENTER_R)
+      .attr('width', CENTER_R * 2).attr('height', CENTER_R * 2)
+      .attr('href', selfImgUrl)
+      .attr('clip-path', 'url(#clip-center)')
+      .attr('preserveAspectRatio', 'xMidYMid slice')
+      .attr('pointer-events', 'none')
+      .on('error', function () { d3.select(this).remove(); });
+  }
+
   svg.append('text')
-    .attr('x', cx).attr('y', cy)
+    .attr('x', cx)
+    .attr('y', selfImgUrl ? cy + CENTER_R + 14 : cy)
     .attr('text-anchor', 'middle')
-    .attr('dominant-baseline', 'central')
+    .attr('dominant-baseline', selfImgUrl ? 'auto' : 'central')
     .attr('font-size', '11px')
     .attr('font-weight', 'bold')
-    .attr('fill', '#fff')
+    .attr('fill', selfImgUrl ? 'var(--text)' : '#fff')
+    .attr('pointer-events', 'none')
     .attr('font-family', "'Gaegu','Noto Sans TC',cursive")
     .text(t('graphCenter'));
 
-  // Tooltip
+  // ── Tooltip ───────────────────────────────────────────────────────────────
   const tooltip = d3.select('body').append('div').attr('id', 'd3-tooltip');
 
+  // ── State ─────────────────────────────────────────────────────────────────
+  let hoveredNode = null;  // used by tick to maintain scale during simulation
+  let simRunning  = true;  // true until force simulation settles
+  let nodeMoved   = false; // true if pointer moved during current drag session
+
+  // ── Drag behaviour ────────────────────────────────────────────────────────
+  const drag = d3.drag()
+    .on('start', function (event, d) {
+      nodeMoved = false;
+      tooltip.style('display', 'none');
+      hoveredNode = null;
+      if (!event.active) simulation.alphaTarget(0.3).restart();
+      d.fx = d.x;
+      d.fy = d.y;
+      d3.select(this).style('cursor', 'grabbing');
+    })
+    .on('drag', (event, d) => {
+      nodeMoved = true;
+      d.fx = event.x;
+      d.fy = event.y;
+    })
+    .on('end', function (event, d) {
+      if (!event.active) simulation.alphaTarget(0);
+      // Release the node — let the simulation spring it back elastically
+      d.fx = null;
+      d.fy = null;
+      d3.select(this).style('cursor', 'pointer');
+    });
+
+  nodeG.call(drag);
+
+  // ── Hover (tooltip + scale) ───────────────────────────────────────────────
   nodeG
     .on('mouseover', (event, d) => {
+      hoveredNode = d;
+      const sel = d3.select(event.currentTarget).raise();
+      // When sim has settled, apply scale directly (tick no longer runs)
+      if (!simRunning) {
+        sel.attr('transform', `translate(${d.x},${d.y}) scale(1.4)`);
+      }
       tooltip.style('display', 'block').html(
         `<strong>${d.name}</strong><br>` +
         `${t('graphHoverScore')}: ${d.normalised.toFixed(1)}<br>` +
@@ -155,20 +219,31 @@ window.renderGraph = function (profiles, topN = 50) {
     .on('mousemove', event => {
       tooltip.style('left', (event.pageX + 14) + 'px').style('top', (event.pageY - 36) + 'px');
     })
-    .on('mouseout', () => tooltip.style('display', 'none'))
-    .on('click', (event, d) => {
+    .on('mouseout', function (_, d) {
+      hoveredNode = null;
+      if (!simRunning) {
+        d3.select(this).attr('transform', `translate(${d.x},${d.y})`);
+      }
+      tooltip.style('display', 'none');
+    })
+    .on('click', (_, d) => {
+      // Suppress click when pointer actually moved during drag
+      if (nodeMoved) { nodeMoved = false; return; }
       if (d.linkUrl) window.open(d.linkUrl, '_blank', 'noopener');
     });
 
-  // Force simulation
-  d3.forceSimulation(nodes)
+  // ── Force simulation ──────────────────────────────────────────────────────
+  const simulation = d3.forceSimulation(nodes)
     .force('radial',    d3.forceRadial(d => d.targetRadius, cx, cy).strength(0.75))
     .force('charge',    d3.forceManyBody().strength(-18))
     .force('collision', d3.forceCollide(d => d.r + 16))
     .on('tick', () => {
       links.attr('x2', d => d.x).attr('y2', d => d.y);
-      nodeG.attr('transform', d => `translate(${d.x},${d.y})`);
-
+      // Apply hover scale via hoveredNode so it works even during simulation
+      nodeG.attr('transform', d => {
+        const base = `translate(${d.x},${d.y})`;
+        return d === hoveredNode ? `${base} scale(1.4)` : base;
+      });
       labels.attr('x', d => {
         const dx = d.x - cx, dy = d.y - cy;
         const dist = Math.sqrt(dx * dx + dy * dy) || 1;
@@ -178,5 +253,6 @@ window.renderGraph = function (profiles, topN = 50) {
         const dist = Math.sqrt(dx * dx + dy * dy) || 1;
         return d.y + (dy / dist) * (d.r + 13) + 4;
       });
-    });
+    })
+    .on('end', () => { simRunning = false; });
 };

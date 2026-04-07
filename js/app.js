@@ -77,12 +77,13 @@ btnAnalyse.addEventListener('click', () => {
   // Defer so browser can repaint the "Parsing…" label before the heavy parse
   setTimeout(() => {
     try {
-      const { profiles, error } = parseFacebookSource(raw);
+      const { profiles, selfImgUrl, error } = parseFacebookSource(raw);
       if (error) {
         errorEl.textContent = t('errorEmpty');
         errorEl.style.display = 'block';
       } else {
         window._lastProfiles = profiles;
+        window._selfImgUrl = selfImgUrl || '';
         renderAll(profiles);
         document.getElementById('graph-section').scrollIntoView({ behavior: 'smooth' });
       }
@@ -288,13 +289,7 @@ async function captureGraphAsPng() {
 
 function initLang() {
   const saved = localStorage.getItem('fb-sg-lang');
-  if (saved) {
-    setLang(saved);
-    return;
-  }
-  // Detect browser language; fall back to zh if not clearly English
-  const browserLang = (navigator.language || navigator.userLanguage || '').toLowerCase();
-  setLang(browserLang.startsWith('en') ? 'en' : 'zh');
+  setLang(saved || 'zh');
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────

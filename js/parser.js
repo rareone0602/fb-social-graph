@@ -138,9 +138,18 @@ function parseFacebookSource(rawHtml) {
   const doc = new DOMParser().parseFromString(rawHtml, 'text/html');
   const html = doc.documentElement.outerHTML;
 
-  // Extract the logged-in user's own ID so we can exclude them
+  // Extract the logged-in user's own ID and profile picture
   const selfMatch = html.match(/"USER_ID":"(\d+)"/);
   const selfId = selfMatch ? selfMatch[1] : null;
+
+  let selfImgUrl = '';
+  if (selfId) {
+    const selfImgRe = new RegExp(`"${selfId}","(?:profilePicture|profile_picture)":\\{"uri":"([^"]+)"`);
+    const selfImgMatch = html.match(selfImgRe);
+    if (selfImgMatch) {
+      try { selfImgUrl = JSON.parse(`"${selfImgMatch[1]}"`); } catch (_) { selfImgUrl = selfImgMatch[1]; }
+    }
+  }
 
   const payloads = extractScriptPayloads(html);
   let dossier = parseBootstrapKeywords(payloads);
@@ -155,8 +164,8 @@ function parseFacebookSource(rawHtml) {
   }
 
   if (Object.keys(dossier).length === 0) {
-    return { profiles: [], error: 'No profile data found. Make sure you pasted the full page source from facebook.com (Ctrl+U).' };
+    return { profiles: [], selfImgUrl: '', error: 'No profile data found. Make sure you pasted the full page source from facebook.com (Ctrl+U).' };
   }
 
-  return { profiles: normalise(dossier), error: null };
+  return { profiles: normalise(dossier), selfImgUrl, error: null };
 }
