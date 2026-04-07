@@ -52,6 +52,10 @@
         <div class="step-num">3</div>
         <div class="step-text" data-i18n="step3"><strong>Select all</strong> &amp; paste below</div>
       </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-text" data-i18n="step4">(Optional) Ask friends to use this tool too, export their CSV, and import it below to see mutual connections</div>
+      </div>
     </div>
 
     <textarea id="source-input" data-i18n-placeholder="placeholder"
@@ -99,6 +103,10 @@
         <span class="legend-dot" style="background:var(--node-inactive)"></span>
         <span data-i18n="graphLegendInact">Inactive</span>
       </span>
+      <span id="legend-import" style="display:none">
+        <span class="legend-dot" style="background:var(--accent2);border:1px dashed var(--accent2)"></span>
+        <span data-i18n="graphLegendImport">Imported edges</span>
+      </span>
     </div>
     <div id="chart-graph"></div>
   </section>
@@ -111,7 +119,6 @@
     <input type="text" id="search-input" placeholder="Search friends..." />
     <span id="search-count"></span>
     <button class="btn-export" id="btn-export">Export CSV</button>
-    <button class="btn-secondary" id="btn-import-merge" data-i18n="btnImport">Import CSV</button>
     <button class="btn-share" id="btn-share" onclick="shareGraph()" data-i18n="btnShare">Share Graph</button>
   </div>
 
@@ -119,6 +126,19 @@
   <div id="table-container"></div>
 
   <div id="toast"></div>
+
+  <!-- Import source-friend selection modal -->
+  <div id="import-modal" class="modal-overlay" style="display:none">
+    <div class="modal-card">
+      <h3 id="import-modal-title" data-i18n="importModalTitle">Whose friend list is this?</h3>
+      <p id="import-modal-desc" data-i18n="importModalDesc">Select the friend who exported this CSV.</p>
+      <select id="import-modal-select"></select>
+      <div class="modal-actions">
+        <button class="btn-primary" id="import-modal-confirm" data-i18n="importModalConfirm">Confirm</button>
+        <button class="btn-secondary" id="import-modal-cancel" data-i18n="importModalCancel">Cancel</button>
+      </div>
+    </div>
+  </div>
 
   <footer>
     FB Social Graph Visualiser &middot; Built with

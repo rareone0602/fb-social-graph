@@ -51,6 +51,9 @@ window.renderAll = function (profiles, topN = 50) {
   graphSection.style.display = 'block';
   document.getElementById('graph-title').textContent = t('graphTitle');
   try { renderGraph(profiles, topN); } catch (e) { console.warn('D3 graph failed:', e); }
+  // Show import legend if there are imported edges
+  const legendImport = document.getElementById('legend-import');
+  if (legendImport) legendImport.style.display = (window._importedEdges || []).length ? '' : 'none';
 
   // ── roughViz charts (deferred for repaint, each wrapped to prevent cascade failure) ──
   requestAnimationFrame(() => {

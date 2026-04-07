@@ -77,13 +77,15 @@ btnAnalyse.addEventListener('click', () => {
   // Defer so browser can repaint the "Parsing…" label before the heavy parse
   setTimeout(() => {
     try {
-      const { profiles, selfImgUrl, error } = parseFacebookSource(raw);
+      const { profiles, selfImgUrl, selfId, selfName, error } = parseFacebookSource(raw);
       if (error) {
         errorEl.textContent = t('errorEmpty');
         errorEl.style.display = 'block';
       } else {
         window._lastProfiles = profiles;
         window._selfImgUrl = selfImgUrl || '';
+        window._selfId = selfId || '';
+        window._selfName = selfName || '';
         renderAll(profiles);
         document.getElementById('graph-section').scrollIntoView({ behavior: 'smooth' });
       }
@@ -101,6 +103,7 @@ btnAnalyse.addEventListener('click', () => {
 btnClear.addEventListener('click', () => {
   input.value = '';
   window._lastProfiles = null;
+  window._importedEdges = [];
   btnAnalyse.disabled = true;
   errorEl.style.display = 'none';
   clearCharts();
@@ -121,32 +124,8 @@ document.getElementById('search-input').addEventListener('input', function () {
   document.getElementById('search-count').textContent = t('searchCount', visible);
 });
 
-// ── Export CSV ────────────────────────────────────────────────────────────────
+// ── CSV helpers ──────────────────────────────────────────────────────────────
 
-document.getElementById('btn-export').addEventListener('click', () => {
-  const profiles = window._lastProfiles;
-  if (!profiles) return;
-
-  const header = ['Rank', 'Name', 'Profile ID', 'Raw Base', 'Score (0-100)', 'Active'].join(',');
-  const rows = profiles.map((p, i) =>
-    [i + 1, `"${p.name.replace(/"/g, '""')}"`, p.profileId || '', p.rawBase.toFixed(6), p.normalised.toFixed(2), p.active ? 'YES' : 'NO'].join(',')
-  );
-  const csv = [header, ...rows].join('\n');
-
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'fb_social_graph.csv';
-  a.click();
-  URL.revokeObjectURL(url);
-});
-
-// ── Import CSV ────────────────────────────────────────────────────────────────
-
-/**
- * Parse a single CSV line, handling quoted fields that may contain commas.
- */
 function parseCsvLine(line) {
   const cols = [];
   let cur = '', inQ = false;
@@ -165,117 +144,279 @@ function parseCsvLine(line) {
   return cols;
 }
 
-/**
- * Parse a CSV exported by this app into an array of profile objects.
- * Tolerates missing columns (Profile ID, Raw Base) for forward compat.
- */
+function csvQuote(s) {
+  return `"${String(s).replace(/"/g, '""')}"`;
+}
+
+// ── Export CSV (unified edge list) ───────────────────────────────────────────
+//
+// Format: Rank, From Name, From ID, To Name, To ID, Raw Base, Score (0-100), Active
+// Contains user→friend edges + all imported edges = superset of any imported CSV.
+
+document.getElementById('btn-export').addEventListener('click', () => {
+  const profiles = window._lastProfiles;
+  if (!profiles) return;
+
+  const selfName = window._selfName || t('graphCenter');
+  const selfId   = window._selfId   || '';
+  const meta     = `# Exported-By: ${selfId || 'unknown'}`;
+  const header   = 'Rank,From Name,From ID,To Name,To ID,Raw Base,Score (0-100),Active';
+
+  const rows = [];
+  let rank = 1;
+
+  // User → friend edges
+  for (const p of profiles) {
+    rows.push([rank++, csvQuote(selfName), selfId, csvQuote(p.name), p.profileId || '', p.rawBase.toFixed(6), p.normalised.toFixed(2), p.active ? 'YES' : 'NO'].join(','));
+  }
+
+  // Imported friend → friend edges (superset of imported files)
+  for (const e of window._importedEdges) {
+    rows.push([rank++, csvQuote(e.fromName), e.fromId, csvQuote(e.toName), e.toId, e.rawBase.toFixed(6), e.normalised.toFixed(2), e.active ? 'YES' : 'NO'].join(','));
+  }
+
+  const csv = [meta, header, ...rows].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'fb_social_graph.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+// ── Import CSV ───────────────────────────────────────────────────────────────
+//
+// Handles two formats:
+//   1. Edge format (has "From Name" column): each row is a directed edge,
+//      no modal needed — source is in the "From" column.
+//   2. Legacy profile format (has "Name" but no "From Name"): rows are profiles,
+//      uses Exported-By metadata or modal to identify source friend.
+//
+// Imported edges are stored in window._importedEdges and included in future exports
+// (superset property).
+
+window._importedEdges = [];
+
 function parseCsvImport(csvText) {
   const lines = csvText.trim().split(/\r?\n/);
   if (lines.length < 2) return null;
 
-  const header = parseCsvLine(lines[0]).map(h => h.trim().toLowerCase().replace(/['"]/g, ''));
+  let exportedById = '';
+  let dataStart = 0;
+  if (lines[0].startsWith('#')) {
+    const m = lines[0].match(/Exported-By:\s*(\S+)/);
+    if (m && m[1] !== 'unknown') exportedById = m[1];
+    dataStart = 1;
+  }
+  if (lines.length < dataStart + 2) return null;
+
+  const header = parseCsvLine(lines[dataStart]).map(h => h.trim().toLowerCase().replace(/['"]/g, ''));
   const col = name => header.findIndex(h => h === name);
 
-  const iName     = col('name');
-  const iId       = header.findIndex(h => h.includes('profile id') || h === 'profileid');
+  const isEdgeFormat = col('from name') >= 0 && col('to name') >= 0;
+
+  if (isEdgeFormat) {
+    return parseEdgeFormat(lines, dataStart, header, col);
+  } else {
+    return parseLegacyFormat(lines, dataStart, header, col, exportedById);
+  }
+}
+
+function parseEdgeFormat(lines, dataStart, header, col) {
+  const iFromName = col('from name');
+  const iFromId   = col('from id');
+  const iToName   = col('to name');
+  const iToId     = col('to id');
   const iRaw      = header.findIndex(h => h.includes('raw'));
   const iScore    = header.findIndex(h => h.includes('score'));
   const iActive   = col('active');
 
-  if (iName === -1 || iScore === -1) return null; // unrecognised format
-
-  const profiles = [];
-  for (let i = 1; i < lines.length; i++) {
+  const edges = [];
+  for (let i = dataStart + 1; i < lines.length; i++) {
     if (!lines[i].trim()) continue;
     const c = parseCsvLine(lines[i]);
-
-    const name      = (c[iName]   || '').trim();
-    const profileId = iId    >= 0 ? (c[iId]    || '').trim() : '';
-    const rawBase   = iRaw   >= 0 ? parseFloat(c[iRaw])   || 0 : 0;
-    const score     = iScore >= 0 ? parseFloat(c[iScore])  || 0 : 0;
-    const active    = iActive >= 0 ? (c[iActive] || '').trim().toUpperCase() === 'YES' : false;
-
-    if (!name) continue;
-
-    profiles.push({
-      name,
-      profileId,
-      // If rawBase is absent, derive a proxy from score so re-normalisation works
-      rawBase: rawBase || score / 100,
-      rawMultiplier: 0,
-      normalised: score,
-      active,
-      imgUrl: '',
-      linkUrl: profileId ? `https://www.facebook.com/profile.php?id=${profileId}` : '',
-    });
+    const fromName = (c[iFromName] || '').trim();
+    const fromId   = iFromId >= 0 ? (c[iFromId] || '').trim() : '';
+    const toName   = (c[iToName] || '').trim();
+    const toId     = iToId >= 0 ? (c[iToId] || '').trim() : '';
+    const rawBase  = iRaw >= 0 ? parseFloat(c[iRaw]) || 0 : 0;
+    const score    = iScore >= 0 ? parseFloat(c[iScore]) || 0 : 0;
+    const active   = iActive >= 0 ? (c[iActive] || '').trim().toUpperCase() === 'YES' : false;
+    if (!fromName || !toName) continue;
+    edges.push({ fromName, fromId, toName, toId, rawBase: rawBase || score / 100, normalised: score, active });
   }
+  return edges.length ? { type: 'edges', edges } : null;
+}
 
-  return profiles.length ? profiles : null;
+function parseLegacyFormat(lines, dataStart, header, col, exportedById) {
+  const iName  = col('name');
+  const iId    = header.findIndex(h => h.includes('profile id') || h === 'profileid');
+  const iRaw   = header.findIndex(h => h.includes('raw'));
+  const iScore = header.findIndex(h => h.includes('score'));
+  const iActive = col('active');
+  if (iName === -1) return null;
+
+  const entries = [];
+  for (let i = dataStart + 1; i < lines.length; i++) {
+    if (!lines[i].trim()) continue;
+    const c = parseCsvLine(lines[i]);
+    const name      = (c[iName] || '').trim();
+    const profileId = iId >= 0 ? (c[iId] || '').trim() : '';
+    const rawBase   = iRaw >= 0 ? parseFloat(c[iRaw]) || 0 : 0;
+    const score     = iScore >= 0 ? parseFloat(c[iScore]) || 0 : 0;
+    const active    = iActive >= 0 ? (c[iActive] || '').trim().toUpperCase() === 'YES' : false;
+    if (!name) continue;
+    entries.push({ name, profileId, rawBase: rawBase || score / 100, normalised: score, active });
+  }
+  return entries.length ? { type: 'legacy', exportedById, entries } : null;
 }
 
 /**
- * Merge imported profiles into existing ones and re-render.
- * Match priority: profileId > name (case-insensitive).
- * Imported data overrides on conflict; existing imgUrl/linkUrl are preserved.
+ * Add edges to _importedEdges where both endpoints are in V.
+ * Skips duplicates and self-loops. Returns count of edges added.
  */
-function applyImport(imported) {
-  const existing = window._lastProfiles ? [...window._lastProfiles] : [];
+function addEdgesToGraph(edges) {
+  const profiles = window._lastProfiles;
+  if (!profiles) return 0;
 
-  for (const imp of imported) {
-    const idx = existing.findIndex(e =>
-      (imp.profileId && imp.profileId === e.profileId) ||
-      e.name.toLowerCase() === imp.name.toLowerCase()
+  const top50 = profiles.slice(0, 50);
+  const vByName = new Map();
+  const vById   = new Map();
+  top50.forEach(p => {
+    vByName.set(p.name.toLowerCase(), p);
+    if (p.profileId) vById.set(p.profileId, p);
+  });
+
+  const selfId = window._selfId || '';
+
+  function resolveV(name, id) {
+    return (id && vById.get(id)) || vByName.get(name.toLowerCase()) || null;
+  }
+
+  let added = 0;
+  for (const e of edges) {
+    // Skip edges that originate from the user (we already have user→friend edges)
+    if (e.fromId && e.fromId === selfId) continue;
+
+    const fromNode = resolveV(e.fromName, e.fromId);
+    const toNode   = resolveV(e.toName, e.toId);
+    if (!fromNode || !toNode) continue;
+    if (fromNode === toNode) continue; // no self-loops
+
+    // Deduplicate
+    const exists = window._importedEdges.some(x =>
+      x.fromName.toLowerCase() === fromNode.name.toLowerCase() &&
+      x.toName.toLowerCase() === toNode.name.toLowerCase()
     );
-    if (idx >= 0) {
-      existing[idx] = {
-        ...existing[idx],
-        rawBase:  imp.rawBase  || existing[idx].rawBase,
-        active:   imp.active,
-        // Keep richer metadata from the parsed-HTML version when available
-        imgUrl:  existing[idx].imgUrl  || imp.imgUrl,
-        linkUrl: existing[idx].linkUrl || imp.linkUrl,
-      };
-    } else {
-      existing.push(imp);
-    }
-  }
+    if (exists) continue;
 
-  // Re-normalise rawBase across the combined set
-  const bases = existing.map(p => p.rawBase).filter(b => b > 0);
-  if (bases.length) {
-    const minB = Math.min(...bases), maxB = Math.max(...bases);
-    const spread = maxB > minB ? maxB - minB : 1;
-    for (const p of existing) {
-      p.normalised = p.rawBase > 0 ? ((p.rawBase - minB) / spread) * 100 : 0;
-    }
+    window._importedEdges.push({
+      fromName: fromNode.name,
+      fromId: fromNode.profileId || e.fromId,
+      toName: toNode.name,
+      toId: toNode.profileId || e.toId,
+      rawBase: e.rawBase,
+      normalised: e.normalised,
+      active: e.active,
+    });
+    added++;
   }
+  return added;
+}
 
-  existing.sort((a, b) => b.rawBase - a.rawBase);
-  window._lastProfiles = existing;
-  renderAll(existing);
-  document.getElementById('graph-section').scrollIntoView({ behavior: 'smooth' });
-  showToast(t('toastImported', imported.length));
+/**
+ * Convert legacy profile-list import into edges (source → each matched profile in V).
+ */
+function legacyToEdges(sourceName, sourceId, entries) {
+  return entries.map(e => ({
+    fromName: sourceName,
+    fromId: sourceId,
+    toName: e.name,
+    toId: e.profileId,
+    rawBase: e.rawBase,
+    normalised: e.normalised,
+    active: e.active,
+  }));
 }
 
 function triggerCsvImport() {
+  if (!window._lastProfiles) {
+    showToast(t('importModalNoData'));
+    return;
+  }
   document.getElementById('csv-file-input').click();
 }
 
 document.getElementById('btn-import').addEventListener('click', triggerCsvImport);
-document.getElementById('btn-import-merge').addEventListener('click', triggerCsvImport);
 
 document.getElementById('csv-file-input').addEventListener('change', function () {
   const file = this.files[0];
   if (!file) return;
-  this.value = ''; // reset so the same file can be re-imported
+  this.value = '';
   const reader = new FileReader();
   reader.onload = e => {
-    const imported = parseCsvImport(e.target.result);
-    if (!imported) { showToast(t('toastImportErr')); return; }
-    applyImport(imported);
+    const result = parseCsvImport(e.target.result);
+    if (!result) { showToast(t('toastImportErr')); return; }
+
+    if (result.type === 'edges') {
+      // New edge format — no modal needed, source is in each row
+      const added = addEdgesToGraph(result.edges);
+      if (added > 0) {
+        renderAll(window._lastProfiles);
+        document.getElementById('graph-section').scrollIntoView({ behavior: 'smooth' });
+        showToast(t('toastImported', added));
+      } else {
+        showToast(t('toastImportNoEdges'));
+      }
+    } else {
+      // Legacy profile format — need modal to identify source friend
+      showImportModal(result.exportedById, result.entries);
+    }
   };
   reader.readAsText(file, 'utf-8');
 });
+
+function showImportModal(exportedById, entries) {
+  const profiles = window._lastProfiles;
+  if (!profiles) return;
+
+  const modal  = document.getElementById('import-modal');
+  const select = document.getElementById('import-modal-select');
+  const top50  = profiles.slice(0, 50);
+
+  select.innerHTML = top50.map(p =>
+    `<option value="${escapeAttr(p.name)}" data-id="${p.profileId || ''}">${p.name}</option>`
+  ).join('');
+
+  if (exportedById) {
+    const match = top50.find(p => p.profileId === exportedById);
+    if (match) select.value = match.name;
+  }
+
+  modal.style.display = 'flex';
+  const cleanup = () => { modal.style.display = 'none'; };
+
+  const onConfirm = () => {
+    cleanup();
+    const opt = select.selectedOptions[0];
+    const sourceName = opt.value;
+    const sourceId   = opt.dataset.id || '';
+    const edges = legacyToEdges(sourceName, sourceId, entries);
+    const added = addEdgesToGraph(edges);
+    if (added > 0) {
+      renderAll(profiles);
+      document.getElementById('graph-section').scrollIntoView({ behavior: 'smooth' });
+      showToast(t('toastImported', added));
+    } else {
+      showToast(t('toastImportNoEdges'));
+    }
+  };
+
+  document.getElementById('import-modal-confirm').onclick = onConfirm;
+  document.getElementById('import-modal-cancel').onclick  = cleanup;
+  modal.onclick = e => { if (e.target === modal) cleanup(); };
+}
 
 // ── Share graph (native share → clipboard → download fallback) ───────────────
 

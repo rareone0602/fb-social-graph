@@ -142,6 +142,13 @@ function parseFacebookSource(rawHtml) {
   const selfMatch = html.match(/"USER_ID":"(\d+)"/);
   const selfId = selfMatch ? selfMatch[1] : null;
 
+  // Extract the user's own display name
+  let selfName = '';
+  const selfNameMatch = html.match(/aria-label="([^"]+?)(?:&#x27;|')s Timeline"/);
+  if (selfNameMatch) {
+    try { selfName = new DOMParser().parseFromString(selfNameMatch[1], 'text/html').body.textContent; } catch (_) { selfName = selfNameMatch[1]; }
+  }
+
   let selfImgUrl = '';
   if (selfId) {
     const selfImgRe = new RegExp(`"${selfId}","(?:profilePicture|profile_picture)":\\{"uri":"([^"]+)"`);
@@ -167,5 +174,5 @@ function parseFacebookSource(rawHtml) {
     return { profiles: [], selfImgUrl: '', error: 'No profile data found. Make sure you pasted the full page source from facebook.com (Ctrl+U).' };
   }
 
-  return { profiles: normalise(dossier), selfImgUrl, error: null };
+  return { profiles: normalise(dossier), selfImgUrl, selfId: selfId || '', selfName: selfName || '', error: null };
 }
