@@ -64,6 +64,34 @@ body {
   transition: background 0.25s, color 0.25s;
 }
 
+/* Visually hidden, still announced by screen readers */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0);
+  white-space: nowrap; border: 0;
+}
+
+/* Visible focus ring for keyboard users */
+*:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Hidden by default; toggled to flex on coarse pointers */
+.mobile-banner {
+  background: color-mix(in srgb, var(--accent) 10%, var(--bg-card));
+  border: 1px solid var(--accent);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 0.8rem 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.95rem;
+  text-align: center;
+}
+
 /* ═══════════════════════════════════════════════════════════
    Controls bar (top-right: theme + lang)
    ═══════════════════════════════════════════════════════════ */
@@ -245,6 +273,52 @@ button {
   margin-top: 0.5rem;
 }
 
+/* Sample-CSV expander shown next to Import CSV */
+.csv-sample {
+  margin: 0.8rem auto 0;
+  max-width: 780px;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.csv-sample summary {
+  cursor: pointer;
+  display: inline-block;
+  padding: 0.3rem 0.6rem;
+  border-radius: 6px;
+  color: var(--text-muted);
+}
+
+.csv-sample summary:hover {
+  color: var(--accent);
+}
+
+.csv-sample[open] summary {
+  color: var(--accent);
+  margin-bottom: 0.4rem;
+}
+
+.csv-sample-intro {
+  margin: 0.4rem 0 0.4rem;
+  color: var(--text-muted);
+}
+
+.csv-sample pre {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.7rem 0.9rem;
+  overflow-x: auto;
+  margin: 0;
+}
+
+.csv-sample code {
+  font-family: monospace;
+  font-size: 0.8rem;
+  color: var(--text);
+  white-space: pre;
+}
+
 /* ═══════════════════════════════════════════════════════════
    Explainer
    ═══════════════════════════════════════════════════════════ */
@@ -323,21 +397,31 @@ button {
   background: var(--bg-card);
   border: 1px solid var(--border-sub);
   border-radius: 10px;
-  padding: 0.7rem 1.4rem;
+  padding: 0.9rem 1.6rem;
   text-align: center;
-  min-width: 120px;
+  min-width: 140px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
 }
 
 .stat-val {
   display: block;
-  font-size: 1.3rem;
+  font-size: 1.5rem;
   font-weight: 700;
   color: var(--accent);
+  line-height: 1.2;
 }
 
 .stat-label {
   font-size: 0.85rem;
   color: var(--text-muted);
+  letter-spacing: 0.3px;
+}
+
+.stat-mutual {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-card));
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -367,9 +451,10 @@ button {
 .graph-legend {
   display: flex;
   gap: 1.5rem;
-  margin-bottom: 0.6rem;
+  margin-bottom: 0.4rem;
   font-size: 0.9rem;
   color: var(--text-muted);
+  flex-wrap: wrap;
 }
 
 .legend-dot {
@@ -378,6 +463,89 @@ button {
   border-radius: 50%;
   margin-right: 4px;
   vertical-align: middle;
+}
+
+.legend-dot-solid {
+  background: var(--accent);
+  border: 2px solid var(--accent);
+}
+
+.legend-dot-hollow {
+  background: transparent;
+  border: 2px solid var(--node-inactive);
+}
+
+.legend-dot-imported {
+  background: transparent;
+  border: 2px dashed var(--accent2);
+}
+
+.graph-hint {
+  font-size: 0.85rem;
+  color: var(--text-subtle);
+  margin: 0 0 0.6rem;
+  font-style: italic;
+}
+
+/* Contributor chip strip — surfaces the imported-edges feature */
+.contributors {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 0 0 0.8rem;
+  padding: 0.6rem 0.8rem;
+  background: color-mix(in srgb, var(--accent2) 8%, var(--bg-card));
+  border: 1px dashed var(--accent2);
+  border-radius: 10px;
+  align-items: center;
+}
+
+.contributors-label {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-right: 0.4rem;
+}
+
+.contributor-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 0.2rem 0.5rem 0.2rem 0.2rem;
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+.contributor-chip img {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--border-sub);
+}
+
+.contributor-chip .chip-count {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  margin-left: 0.2rem;
+}
+
+.contributor-chip .chip-remove {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0 0.2rem;
+  font-size: 1rem;
+  line-height: 1;
+  border-radius: 50%;
+  transition: color 0.15s, background 0.15s;
+}
+
+.contributor-chip .chip-remove:hover {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
 /* Name labels on D3 nodes — halo stroke for readability on any background */
@@ -410,8 +578,8 @@ text.node-label {
 }
 .btn-share:hover { background: var(--accent-hover); }
 
-#d3-tooltip {
-  position: absolute;
+.d3-tooltip {
+  position: fixed;
   display: none;
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -423,6 +591,41 @@ text.node-label {
   color: var(--text);
   font-family: 'Gaegu', 'Noto Sans TC', cursive;
   box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+  max-width: 240px;
+}
+
+/* Don't let pinch / two-finger pan scroll the page when the user is
+   interacting with the orbit. */
+#chart-graph svg {
+  touch-action: none;
+  display: block;
+}
+
+/* Search-driven fade & pulse */
+.friend-node, .orbit-link, .import-link, .node-label {
+  transition: opacity 0.2s ease;
+}
+
+.friend-node.faded, .orbit-link.faded, .import-link.faded, .node-label.faded {
+  opacity: 0.15;
+}
+
+@keyframes node-pulse {
+  0%   { filter: drop-shadow(0 0 0 var(--accent)); }
+  50%  { filter: drop-shadow(0 0 8px var(--accent)); }
+  100% { filter: drop-shadow(0 0 0 var(--accent)); }
+}
+
+.friend-node.highlight {
+  animation: node-pulse 1.4s ease-in-out infinite;
+}
+
+.friend-node:focus-visible {
+  outline: none;
+}
+.friend-node:focus-visible .node-bg {
+  stroke: var(--text);
+  stroke-width: 3;
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -583,4 +786,75 @@ footer a { color: var(--accent); }
   opacity: 1;
   transform: translateX(-50%) translateY(0);
   pointer-events: auto;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Import dialog
+   ═══════════════════════════════════════════════════════════ */
+dialog.modal-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.5rem 2rem;
+  max-width: 420px;
+  width: 90%;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  color: var(--text);
+}
+
+dialog.modal-card::backdrop {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+dialog.modal-card h3 {
+  color: var(--accent);
+  font-size: 1.3rem;
+  margin-bottom: 0.5rem;
+}
+
+dialog.modal-card p {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+  line-height: 1.4;
+}
+
+dialog.modal-card select {
+  width: 100%;
+  padding: 0.5rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-input);
+  color: var(--text);
+  font-family: 'Gaegu', 'Noto Sans TC', cursive;
+  font-size: 1rem;
+  margin-bottom: 1rem;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 0.8rem;
+  justify-content: flex-end;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Small-screen overrides
+   ═══════════════════════════════════════════════════════════ */
+@media (max-width: 600px) {
+  #controls {
+    position: static;
+    justify-content: center;
+    padding: 0.6rem;
+    margin-top: 0.4rem;
+  }
+
+  header {
+    padding-top: 0.4rem;
+  }
+
+  header h1 { font-size: 1.8rem; }
+  header p  { font-size: 1rem; }
+
+  .step { min-width: 140px; padding: 0.6rem 0.8rem; }
+  .step-text { font-size: 0.9rem; }
 }

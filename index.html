@@ -40,6 +40,10 @@
 
   <!-- Input -->
   <section class="input-section">
+    <div class="mobile-banner" id="mobile-banner" data-i18n="mobileBanner" hidden>
+      This tool needs a desktop browser to view Facebook's page source. Open it on your laptop to continue.
+    </div>
+
     <div class="steps">
       <div class="step">
         <div class="step-num">1</div>
@@ -47,23 +51,39 @@
       </div>
       <div class="step">
         <div class="step-num">2</div>
-        <div class="step-text" data-i18n="step2">Press <strong>Ctrl+U</strong> to view source</div>
+        <div class="step-text" data-i18n="step2">On desktop, press <strong>Ctrl+U</strong> (<strong>⌘+U</strong> on Mac) to view source</div>
       </div>
       <div class="step">
         <div class="step-num">3</div>
         <div class="step-text" data-i18n="step3"><strong>Select all</strong> &amp; paste below</div>
       </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-text" data-i18n="step4">(Optional) Ask friends to use this tool too, export their CSV, and import it below to see mutual connections</div>
+      </div>
     </div>
 
+    <label class="sr-only" for="source-input" data-i18n="sourceInputLabel">Facebook page source</label>
     <textarea id="source-input" data-i18n-placeholder="placeholder"
       placeholder="Paste your Facebook page source here (Ctrl+V)..."></textarea>
 
     <div class="btn-row">
       <button class="btn-primary" id="btn-analyse" disabled data-i18n="btnAnalyse">Analyse</button>
       <button class="btn-secondary" id="btn-clear" data-i18n="btnClear">Clear</button>
+      <button class="btn-secondary" id="btn-import" data-i18n="btnImport">Import CSV</button>
     </div>
+    <input type="file" id="csv-file-input" accept=".csv" hidden>
 
-    <div class="error-msg" id="error-msg"></div>
+    <details class="csv-sample">
+      <summary data-i18n="sampleCsvSummary">What's the file format?</summary>
+      <p class="csv-sample-intro" data-i18n="sampleCsvIntro">Two example rows from this app's CSV — same format your friends will export:</p>
+<pre><code># Exported-By: 100001234567890
+Rank,From Name,From ID,To Name,To ID,Raw Base,Score (0-100),Active
+1,"Alice",100001234567890,"Bob",100009876543210,0.412847,98.40,YES
+2,"Alice",100001234567890,"Charlie",100005551234567,0.402113,73.20,NO</code></pre>
+    </details>
+
+    <div class="error-msg" id="error-msg" role="alert"></div>
     <div class="privacy-note" data-i18n="privacy">
       Your data never leaves this page. All parsing happens locally in your browser.
     </div>
@@ -91,14 +111,20 @@
     <h2 id="graph-title"></h2>
     <div class="graph-legend">
       <span>
-        <span class="legend-dot" style="background:var(--accent)"></span>
+        <span class="legend-dot legend-dot-solid" aria-hidden="true"></span>
         <span data-i18n="graphLegendActive">Active</span>
       </span>
       <span>
-        <span class="legend-dot" style="background:var(--node-inactive)"></span>
+        <span class="legend-dot legend-dot-hollow" aria-hidden="true"></span>
         <span data-i18n="graphLegendInact">Inactive</span>
       </span>
+      <span id="legend-import" style="display:none">
+        <span class="legend-dot legend-dot-imported" aria-hidden="true"></span>
+        <span data-i18n="graphLegendImport">Imported edges</span>
+      </span>
     </div>
+    <p class="graph-hint" data-i18n="graphHint">Tap a node to open the profile · drag to pin · zoom &amp; pan to explore</p>
+    <div id="contributors" class="contributors" hidden></div>
     <div id="chart-graph"></div>
   </section>
 
@@ -107,8 +133,9 @@
 
   <!-- Search + Export -->
   <div id="table-controls">
+    <label class="sr-only" for="search-input" data-i18n="searchPlaceholder">Search friends</label>
     <input type="text" id="search-input" placeholder="Search friends..." />
-    <span id="search-count"></span>
+    <span id="search-count" aria-live="polite"></span>
     <button class="btn-export" id="btn-export">Export CSV</button>
     <button class="btn-share" id="btn-share" onclick="shareGraph()" data-i18n="btnShare">Share Graph</button>
   </div>
@@ -117,6 +144,18 @@
   <div id="table-container"></div>
 
   <div id="toast"></div>
+
+  <!-- Import source-friend selection dialog -->
+  <dialog id="import-modal" class="modal-card" aria-labelledby="import-modal-title">
+    <h3 id="import-modal-title" data-i18n="importModalTitle">Whose friend list is this?</h3>
+    <p id="import-modal-desc" data-i18n="importModalDesc">Select the friend who exported this CSV.</p>
+    <label class="sr-only" for="import-modal-select" data-i18n="importModalTitle">Source friend</label>
+    <select id="import-modal-select"></select>
+    <div class="modal-actions">
+      <button class="btn-primary" id="import-modal-confirm" data-i18n="importModalConfirm">Confirm</button>
+      <button class="btn-secondary" id="import-modal-cancel" data-i18n="importModalCancel">Cancel</button>
+    </div>
+  </dialog>
 
   <footer>
     FB Social Graph Visualiser &middot; Built with
