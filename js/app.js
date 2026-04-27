@@ -111,7 +111,9 @@ btnClear.addEventListener('click', () => {
 
 // ── Search ────────────────────────────────────────────────────────────────────
 
-document.getElementById('search-input').addEventListener('input', function () {
+const searchInput = document.getElementById('search-input');
+
+searchInput.addEventListener('input', function () {
   const q = this.value.toLowerCase().trim();
   const rows = document.querySelectorAll('#table-container tbody tr');
   let visible = 0;
@@ -122,6 +124,16 @@ document.getElementById('search-input').addEventListener('input', function () {
     if (show) visible++;
   });
   document.getElementById('search-count').textContent = t('searchCount', visible);
+  if (typeof window.highlightGraphNode === 'function') window.highlightGraphNode(q);
+});
+
+// Esc clears search + restores graph
+searchInput.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && searchInput.value) {
+    searchInput.value = '';
+    searchInput.dispatchEvent(new Event('input'));
+    searchInput.blur();
+  }
 });
 
 // ── CSV helpers ──────────────────────────────────────────────────────────────
@@ -356,8 +368,9 @@ document.getElementById('csv-file-input').addEventListener('change', function ()
   this.value = '';
   const reader = new FileReader();
   reader.onload = e => {
+    errorEl.style.display = 'none';
     const result = parseCsvImport(e.target.result);
-    if (!result) { showToast(t('toastImportErr')); return; }
+    if (!result) { showImportError(t('toastImportErr')); return; }
 
     if (result.type === 'edges') {
       // New edge format — no modal needed, source is in each row
@@ -367,7 +380,7 @@ document.getElementById('csv-file-input').addEventListener('change', function ()
         document.getElementById('graph-section').scrollIntoView({ behavior: 'smooth' });
         showToast(t('toastImported', added));
       } else {
-        showToast(t('toastImportNoEdges'));
+        showImportError(t('toastImportNoEdges'));
       }
     } else {
       // Legacy profile format — need modal to identify source friend
@@ -376,6 +389,65 @@ document.getElementById('csv-file-input').addEventListener('change', function ()
   };
   reader.readAsText(file, 'utf-8');
 });
+
+// Persistent import errors (replaces 3-second toasts that swallowed the message)
+function showImportError(msg) {
+  errorEl.textContent = msg;
+  errorEl.style.display = 'block';
+}
+
+// ── Contributor chip strip ────────────────────────────────────────────────────
+// One chip per friend who has imported their CSV. Click × to remove just that
+// contributor's edges (the only "undo per import" surface — Clear wipes all).
+
+window.renderContributors = function () {
+  const wrap = document.getElementById('contributors');
+  if (!wrap) return;
+  const edges = window._importedEdges || [];
+  if (!edges.length) {
+    wrap.hidden = true;
+    wrap.innerHTML = '';
+    return;
+  }
+  const profiles = window._lastProfiles || [];
+  const profileById = new Map(profiles.map(p => [p.profileId, p]));
+  const profileByName = new Map(profiles.map(p => [p.name.toLowerCase(), p]));
+
+  // Group edges by contributor (fromName, lower-cased)
+  const groups = new Map();
+  for (const e of edges) {
+    const k = e.fromName.toLowerCase();
+    if (!groups.has(k)) groups.set(k, { name: e.fromName, fromId: e.fromId, count: 0 });
+    groups.get(k).count++;
+  }
+
+  const chips = [...groups.values()].map(g => {
+    const profile = profileById.get(g.fromId) || profileByName.get(g.name.toLowerCase());
+    const img = profile && profile.imgUrl
+      ? `<img src="${escapeAttr(profile.imgUrl)}" alt="" onerror="this.style.display='none'">`
+      : '';
+    return `<span class="contributor-chip" data-name="${escapeAttr(g.name.toLowerCase())}">
+      ${img}
+      <span class="chip-name">${escapeHtml(g.name)}</span>
+      <span class="chip-count">· ${g.count}</span>
+      <button class="chip-remove" type="button" aria-label="${escapeAttr(t('removeContributor', g.name))}">×</button>
+    </span>`;
+  }).join('');
+
+  wrap.innerHTML = `<span class="contributors-label">${t('contributorsLabel')}</span>${chips}`;
+  wrap.hidden = false;
+
+  wrap.querySelectorAll('.chip-remove').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const chip = btn.closest('.contributor-chip');
+      const target = chip.dataset.name;
+      window._importedEdges = (window._importedEdges || []).filter(
+        e => e.fromName.toLowerCase() !== target
+      );
+      if (window._lastProfiles) renderAll(window._lastProfiles);
+    });
+  });
+};
 
 function showImportModal(exportedById, entries) {
   const profiles = window._lastProfiles;
@@ -394,11 +466,14 @@ function showImportModal(exportedById, entries) {
     if (match) select.value = match.name;
   }
 
-  modal.style.display = 'flex';
-  const cleanup = () => { modal.style.display = 'none'; };
+  // Native <dialog>: Esc closes, focus is trapped, backdrop is provided.
+  if (typeof modal.showModal === 'function') modal.showModal();
+  else modal.setAttribute('open', '');
 
-  const onConfirm = () => {
-    cleanup();
+  const close = () => { if (modal.open) modal.close(); else modal.removeAttribute('open'); };
+
+  document.getElementById('import-modal-confirm').onclick = () => {
+    close();
     const opt = select.selectedOptions[0];
     const sourceName = opt.value;
     const sourceId   = opt.dataset.id || '';
@@ -409,13 +484,16 @@ function showImportModal(exportedById, entries) {
       document.getElementById('graph-section').scrollIntoView({ behavior: 'smooth' });
       showToast(t('toastImported', added));
     } else {
-      showToast(t('toastImportNoEdges'));
+      showImportError(t('toastImportNoEdges'));
     }
   };
-
-  document.getElementById('import-modal-confirm').onclick = onConfirm;
-  document.getElementById('import-modal-cancel').onclick  = cleanup;
-  modal.onclick = e => { if (e.target === modal) cleanup(); };
+  document.getElementById('import-modal-cancel').onclick = close;
+  // Click on backdrop closes (native <dialog> doesn't do this by default)
+  modal.onclick = e => {
+    const r = modal.getBoundingClientRect();
+    const inside = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+    if (!inside) close();
+  };
 }
 
 // ── Share graph (native share → clipboard → download fallback) ───────────────
@@ -490,6 +568,9 @@ async function captureGraphAsPng() {
   // Remove external <image> elements (Facebook CDN blocks CORS, tainting the canvas).
   // The colored circle fallbacks underneath will show through instead.
   clone.querySelectorAll('image').forEach(img => img.remove());
+
+  // Reset any active zoom/pan so the exported image shows the full orbit.
+  clone.querySelectorAll('.zoom-root').forEach(g => g.removeAttribute('transform'));
 
   // Background
   const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
@@ -575,3 +656,23 @@ initLang();
 // Translate share button on init
 const btnShare = document.getElementById('btn-share');
 if (btnShare) btnShare.textContent = t('btnShare');
+
+// Show the mobile banner when the user is on a touch-only device that can't
+// view Facebook page source (no Ctrl+U).
+(function initMobileBanner() {
+  const banner = document.getElementById('mobile-banner');
+  if (!banner) return;
+  const isCoarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+  if (isCoarse) banner.hidden = false;
+})();
+
+// Global keyboard shortcut: '/' focuses search input (when not typing in another field)
+document.addEventListener('keydown', e => {
+  if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey) return;
+  const tag = (e.target && e.target.tagName) || '';
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+  const search = document.getElementById('search-input');
+  if (!search || search.offsetParent === null) return; // hidden
+  e.preventDefault();
+  search.focus();
+});
